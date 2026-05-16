@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.DS_Store
+data/videos/*
+data/outputs/*
+!data/videos/.gitkeep
+!data/outputs/.gitkeep
+models/*.pt
+!models/.gitkeep
+*.mp4
+*.avi
+*.mov
+*.mkv
