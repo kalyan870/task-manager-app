@@ -52,3 +52,9 @@ The root script starts the server and client together. The API defaults to port 
 ## Deployment and data
 
 Configure the API URL, MongoDB connection, and secret values in the chosen hosting provider. The current app is designed around a separately running Express server and MongoDB; deploying only the static client is not sufficient. Review CORS, authentication, and production database settings before exposing real user data.
+
+
+## Live UI preview
+
+[Open the static task-manager preview](https://kalyan870.github.io/task-manager-app/). This preview uses sample tasks and does not connect to the React/Express backend. Full app operation requires MongoDB and JWT configuration as described above.
+
