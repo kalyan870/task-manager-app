@@ -28,13 +28,13 @@ npm install
 npm run install:all
 ```
 
-Copy `server/.env.example` to `server/.env`, set `MONGODB_URI` and a long random `JWT_SECRET`, then run:
+Copy `server/.env.example` to `server/.env`, set a database URI and a long random `JWT_SECRET`, then run:
 
 ```bash
 npm run dev
 ```
 
-The root script starts the server and client together. The API defaults to port `5000`; the Vite client prints its own local URL. Never commit the real `server/.env` file.
+The root script starts the server and client together. The API defaults to port `5000`; the Vite client prints its own local URL. `CLIENT_ORIGINS` is a comma-separated CORS allowlist (defaults to local Vite). For a separately hosted frontend, set `VITE_API_BASE_URL` at client build time and include that exact origin in `CLIENT_ORIGINS`. Never commit the real `server/.env` file.
 
 ## Scripts
 
@@ -42,6 +42,7 @@ The root script starts the server and client together. The API defaults to port 
 - `npm run build` — build the client
 - `npm start` — start the API
 - `npm run install:all` — install server and client dependencies
+- `npm test` — run task-input safety tests
 
 ## Repository layout
 
@@ -51,7 +52,7 @@ The root script starts the server and client together. The API defaults to port 
 
 ## Deployment and data
 
-Configure the API URL, MongoDB connection, and secret values in the chosen hosting provider. The current app is designed around a separately running Express server and MongoDB; deploying only the static client is not sufficient. Review CORS, authentication, and production database settings before exposing real user data.
+Task writes accept only documented editable fields, so clients cannot change task ownership. Search terms are escaped as literal text. Socket.IO requires the user's JWT and sends task events only to that user's room. Configure the API URL, allowed frontend origin, MongoDB connection, and secret values in the chosen hosting provider. The app requires a separately running Express server and MongoDB; deploying only the static client is not sufficient. Review production database settings before exposing real user data.
 
 
 ## Live UI preview
