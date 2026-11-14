@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
-const API = '/api/tasks';
+const API = `${import.meta.env.VITE_API_BASE_URL || ''}/api/tasks`;
 let socket = null;
 
 const TaskContext = createContext();
@@ -13,9 +13,14 @@ export function TaskProvider({ children }) {
   const [filter, setFilter] = useState({ status: '', priority: '', search: '' });
 
   useEffect(() => {
-    socket = io('/', { transports: ['websocket', 'polling'] });
+    if (!token) {
+      socket?.close();
+      socket = null;
+      return;
+    }
+    socket = io('/', { auth: { token }, transports: ['websocket', 'polling'] });
     return () => socket?.close();
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     if (!socket) return;
@@ -31,7 +36,7 @@ export function TaskProvider({ children }) {
       socket.off('taskUpdated');
       socket.off('taskDeleted');
     };
-  }, []);
+  }, [token]);
 
   const fetchTasks = useCallback(async () => {
     if (!token) return;
