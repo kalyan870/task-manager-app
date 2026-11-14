@@ -2,7 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
 
-const API = `${import.meta.env.VITE_API_BASE_URL || ''}/api/tasks`;
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
+const API = `${API_BASE_URL}/api/tasks`;
 let socket = null;
 
 const TaskContext = createContext();
@@ -18,7 +19,7 @@ export function TaskProvider({ children }) {
       socket = null;
       return;
     }
-    socket = io('/', { auth: { token }, transports: ['websocket', 'polling'] });
+    socket = io(API_BASE_URL || '/', { auth: { token }, transports: ['websocket', 'polling'] });
     return () => socket?.close();
   }, [token]);
 
