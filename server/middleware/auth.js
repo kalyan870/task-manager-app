@@ -1,19 +1,32 @@
-import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import { verifyToken } from '@clerk/backend';
 
-export const protect = async (req, res, next) => {
-  let token;
-  if (req.headers.authorization?.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
-  }
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token' });
-  }
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = await User.findById(decoded.id).select('-password');
-    next();
-  } catch {
-    res.status(401).json({ message: 'Not authorized, token failed' });
-  }
+const bearerToken = (header = '') => {
+  const match = /^Bearer\s+([A-Za-z0-9._-]+)$/i.exec(header);
+  return match?.[1] || null;
 };
+
+export function createRequireUser({ verify = verifyToken, env = process.env } = {}) {
+  return async function requireUser(req, res, next) {
+    const token = bearerToken(req.headers.authorization);
+    if (!token) return res.status(401).json({ message: 'Sign in required' });
+    const authorizedParties = (env.CLERK_AUTHORIZED_PARTIES || env.CLIENT_ORIGINS || '')
+      .split(',').map((origin) => origin.trim()).filter(Boolean);
+    if ((!env.CLERK_SECRET_KEY && !env.CLERK_JWT_KEY) || !authorizedParties.length) {
+      return res.status(503).json({ message: 'Authentication is not configured' });
+    }
+    try {
+      const claims = await verify(token, {
+        secretKey: env.CLERK_SECRET_KEY,
+        jwtKey: env.CLERK_JWT_KEY,
+        authorizedParties,
+      });
+      if (typeof claims.sub !== 'string' || !claims.sub) return res.status(401).json({ message: 'Invalid session' });
+      req.userId = claims.sub;
+      return next();
+    } catch {
+      return res.status(401).json({ message: 'Invalid or expired session' });
+    }
+  };
+}
+
+export const protect = createRequireUser();
