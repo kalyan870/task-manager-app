@@ -4,89 +4,69 @@ import { useAuth } from './AuthContext';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/+$/, '');
 const API = `${API_BASE_URL}/api/tasks`;
-let socket = null;
-
 const TaskContext = createContext();
 
 export function TaskProvider({ children }) {
-  const { token } = useAuth();
+  const { user, getToken } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState({ status: '', priority: '', search: '' });
 
-  useEffect(() => {
-    if (!token) {
-      socket?.close();
-      socket = null;
-      return;
-    }
-    socket = io(API_BASE_URL || '/', { auth: { token }, transports: ['websocket', 'polling'] });
-    return () => socket?.close();
-  }, [token]);
+  const authHeaders = useCallback(async (extra = {}) => {
+    const token = await getToken();
+    if (!token) throw new Error('Sign in required');
+    return { ...extra, Authorization: `Bearer ${token}` };
+  }, [getToken]);
 
   useEffect(() => {
-    if (!socket) return;
-    socket.on('taskCreated', (task) => setTasks((prev) => [task, ...prev]));
-    socket.on('taskUpdated', (task) =>
-      setTasks((prev) => prev.map((t) => (t._id === task._id ? task : t)))
-    );
-    socket.on('taskDeleted', (id) =>
-      setTasks((prev) => prev.filter((t) => t._id !== id))
-    );
-    return () => {
-      socket.off('taskCreated');
-      socket.off('taskUpdated');
-      socket.off('taskDeleted');
-    };
-  }, [token]);
+    let active = true;
+    let connection;
+    if (!user) {
+      setTasks([]);
+      return undefined;
+    }
+    getToken().then((token) => {
+      if (!active || !token) return;
+      connection = io(API_BASE_URL || '/', { auth: { token }, transports: ['websocket', 'polling'] });
+      connection.on('taskCreated', (task) => setTasks((prev) => [task, ...prev.filter((item) => item._id !== task._id)]));
+      connection.on('taskUpdated', (task) => setTasks((prev) => prev.map((item) => item._id === task._id ? task : item)));
+      connection.on('taskDeleted', (id) => setTasks((prev) => prev.filter((item) => item._id !== id)));
+    }).catch(() => {});
+    return () => { active = false; connection?.close(); };
+  }, [user?.id, getToken]);
 
   const fetchTasks = useCallback(async () => {
-    if (!token) return;
+    if (!user) return setTasks([]);
     const params = new URLSearchParams();
     if (filter.status) params.set('status', filter.status);
     if (filter.priority) params.set('priority', filter.priority);
     if (filter.search) params.set('search', filter.search);
-    const res = await fetch(`${API}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const data = await res.json();
-    setTasks(data);
-  }, [token, filter]);
+    const res = await fetch(`${API}?${params}`, { headers: await authHeaders() });
+    if (!res.ok) throw new Error(res.status === 503 ? 'Task storage is not configured' : 'Could not load tasks');
+    setTasks(await res.json());
+  }, [user?.id, filter, authHeaders]);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => { fetchTasks().catch(() => setTasks([])); }, [fetchTasks]);
 
   const createTask = async (taskData) => {
     const res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(taskData),
+      method: 'POST', headers: await authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(taskData),
     });
-    if (!res.ok) throw new Error('Failed to create task');
+    if (!res.ok) throw new Error((await res.json()).message || 'Failed to create task');
     return res.json();
   };
-
   const updateTask = async (id, taskData) => {
     const res = await fetch(`${API}/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify(taskData),
+      method: 'PUT', headers: await authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(taskData),
     });
-    if (!res.ok) throw new Error('Failed to update task');
+    if (!res.ok) throw new Error((await res.json()).message || 'Failed to update task');
     return res.json();
   };
-
   const deleteTask = async (id) => {
-    const res = await fetch(`${API}/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error('Failed to delete task');
+    const res = await fetch(`${API}/${id}`, { method: 'DELETE', headers: await authHeaders() });
+    if (!res.ok) throw new Error((await res.json()).message || 'Failed to delete task');
   };
 
-  return (
-    <TaskContext.Provider value={{ tasks, filter, setFilter, fetchTasks, createTask, updateTask, deleteTask }}>
-      {children}
-    </TaskContext.Provider>
-  );
+  return <TaskContext.Provider value={{ tasks, filter, setFilter, fetchTasks, createTask, updateTask, deleteTask }}>{children}</TaskContext.Provider>;
 }
 
 export const useTasks = () => useContext(TaskContext);

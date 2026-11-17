@@ -1,61 +1,48 @@
 # Task Manager App
 
-<p align="center"><strong>A React and Express task-management application, kept alongside several project snapshots and experiments in one repository.</strong></p>
+<p align="center"><strong>A React and Express task-management application, kept alongside separate project snapshots and experiments.</strong></p>
 
-<p align="center">React · Vite · Express · Socket.IO · MongoDB</p>
+<p align="center">React | Vite | Express | Socket.IO | Clerk | Neon</p>
 
 ## Project overview
 
-The top-level `client/` and `server/` folders form the task-manager application. The server is configured for MongoDB, JWT authentication, and Socket.IO. The repository also contains additional project folders and snapshots (including object counting, monitoring, and other app copies); these folders are not wired together as one application.
+The top-level `client/` and `server/` folders form the task-manager application. Clerk provides sign-in; the Express API verifies Clerk session tokens and scopes every task query to the verified user. Neon stores tasks in PostgreSQL. Socket.IO authenticates the same session and emits only to that user's room. This app has no file-upload workflow, so it does not add object storage. Other project-named folders in this repository are separate snapshots, not one combined application.
 
-## Main app architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-  U[User] --> C[React + Vite client]
-  C -->|HTTP and Socket.IO| A[Express server]
-  A --> R[Auth and task routes]
-  R --> M[Mongoose]
-  M --> D[(MongoDB)]
+  U[User] --> C[React + Vite + Clerk]
+  C -->|Bearer session token| A[Express API]
+  A -->|Verify session server-side| K[Clerk]
+  A --> R[Owner-scoped task routes]
+  R -->|Parameterized SQL| N[(Neon PostgreSQL)]
+  C -->|Authenticated Socket.IO| A
 ```
 
-## Run the task manager
+## Setup
 
-Use Node.js and MongoDB. From the repository root:
+Requirements: Node.js, a Clerk application, and a Neon PostgreSQL database.
 
 ```bash
 npm install
 npm run install:all
 ```
 
-Copy `server/.env.example` to `server/.env`, set a database URI and a long random `JWT_SECRET`, then run:
+Copy `server/.env.example` to `server/.env` and `client/.env.example` to `client/.env`. Apply `server/migrations/0001_tasks.sql` to Neon. Set `DATABASE_URL` and either `CLERK_SECRET_KEY` or `CLERK_JWT_KEY` only in the server environment. Set `VITE_CLERK_PUBLISHABLE_KEY` in the client environment. Configure `CLERK_AUTHORIZED_PARTIES` and `CLIENT_ORIGINS` to the exact frontend origin(s), and `VITE_API_BASE_URL` to the API origin when hosted separately. Never commit secrets or real `.env` files.
 
-```bash
-npm run dev
-```
+Run both apps with `npm run dev`. The API defaults to port `5000`; Vite prints the client URL. The root scripts also provide `npm run build`, `npm test`, and `npm start`.
 
-The root script starts the server and client together. The API defaults to port `5000`; the Vite client prints its own local URL. `CLIENT_ORIGINS` is a comma-separated CORS allowlist (defaults to local Vite). For a separately hosted frontend, set `VITE_API_BASE_URL` at client build time and include that exact origin in `CLIENT_ORIGINS`. Never commit the real `server/.env` file.
+## Security and data
 
-## Scripts
-
-- `npm run dev` — start the client and API
-- `npm run build` — build the client
-- `npm start` — start the API
-- `npm run install:all` — install server and client dependencies
-- `npm test` — run task-input safety tests
+The server verifies Clerk tokens and derives ownership only from the verified subject. Task updates accept only editable fields; every database query is parameterized and owner-scoped. Socket.IO validates sessions and routes events only to that user's room. Keep the Neon connection string and Clerk secret/JWT keys server-side; only the Clerk publishable key belongs in Vite client configuration. No production credentials are included. The app requires a running Express server and Neon database; a static client deployment alone is not the full app.
 
 ## Repository layout
 
-- `client/` and `server/` — primary task-manager app
-- `object-counting-project/` — separate Streamlit project
-- Other top-level project-named folders — additional snapshots; inspect their own manifests before running
-
-## Deployment and data
-
-Task writes accept only documented editable fields, so clients cannot change task ownership. Search terms are escaped as literal text. Socket.IO requires the user's JWT and sends task events only to that user's room. Configure the API URL, allowed frontend origin, MongoDB connection, and secret values in the chosen hosting provider. The app requires a separately running Express server and MongoDB; deploying only the static client is not sufficient. Review production database settings before exposing real user data.
-
+- `client/` and `server/`: primary task-manager application
+- `server/migrations/`: PostgreSQL schema
+- Other top-level project folders: separate snapshots and experiments
 
 ## Live UI preview
 
-[Open the static task-manager preview](https://kalyan870.github.io/task-manager-app/). This preview uses sample tasks and does not connect to the React/Express backend. Full app operation requires MongoDB and JWT configuration as described above.
-
+[Open the static task-manager preview](https://kalyan870.github.io/task-manager-app/). It uses sample tasks and does not connect to the React/Express backend.
