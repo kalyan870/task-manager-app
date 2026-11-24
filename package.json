@@ -9,6 +9,6 @@
     "start": "cd server && npm start"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^10.0.7"
   }
 }
