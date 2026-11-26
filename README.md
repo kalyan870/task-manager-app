@@ -10,6 +10,11 @@ The top-level `client/` and `server/` folders form the task-manager application.
 
 ## Architecture
 
+![task-manager-app architecture map](docs/images/task-manager-app-architecture.png)
+
+[Architecture notes](docs/architecture.md) · [Editable SVG](docs/images/task-manager-app-architecture.svg)
+
+
 ```mermaid
 flowchart LR
   U[User] --> C[React + Vite + Clerk]
